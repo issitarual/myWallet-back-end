@@ -3,6 +3,7 @@ import Joi from 'joi';
 import bcrypt from 'bcrypt';
 import connection from './database/database.js';
 import cors from 'cors';
+import { v4 as uuid } from 'uuid';
 
 const app = express();
 app.use(express.json());
@@ -71,26 +72,60 @@ app.post("/sign-in", async (req, res) => {
   if(error) return res.sendStatus(400);
 
   try{
-    const user = await connection.query(`
+    const result = await connection.query(`
       SELECT * FROM users
       WHERE email = $1
     `, [email]);
 
-    const validateUser = user.rows[0];
+    const user = result.rows[0];
 
-    if(validateUser && bcrypt.compareSync(password, validateUser.password)){
-      res.send(validateUser);
+    if(user && bcrypt.compareSync(password, user.password)){
+      const token = uuid();
+      await connection.query(`
+        INSERT INTO sessions ("userId", token)
+        VALUES ($1, $2)
+      `, [user.id, token]);
+
+      user.token = token;
+      delete user.password;
+
+      res.send(user);
     } 
     else{ 
-      res.sendStatus (400);
+      res.sendStatus (401);
     }
 
   }
   catch(e){
     console.log(e);
     res.sendStatus(400);
-  }
+  };
+});
 
+app.get("/historic", async (req, res) => {
+  const authorization = req.headers['authorization'];
+  const token = authorization?.replace('Bearer ', "");
+
+  if(!token) return sendStatus(401);
+
+});
+
+app.post("/sign-out", async (req, res) => {
+  const authorization = req.headers['authorization'];
+  const token = authorization?.replace('Bearer ', "");
+
+  if(!token) return sendStatus(401);
+  try{
+      await connection.query(`
+      DELETE FROM sessions
+      WHERE token = $1
+    `, [token]);
+
+    res.sendStatus(200);
+  }
+  catch{
+    res.sendStatus(400);
+  }
 })
 
 app.listen(4000, () => {
