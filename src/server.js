@@ -2,25 +2,25 @@ import express from 'express';
 import Joi from 'joi';
 import bcrypt from 'bcrypt';
 import connection from './database/database.js';
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 app.post("/sign-up", async (req, res) => {
-  const { name, email, password, repeatPassword } = req.body;
+  const { name, email, password } = req.body;
 
   const schema = Joi.object({
     name: Joi.string().alphanum().min(1).required(),
     email: Joi.string().email({ minDomainSegments: 2, tlds: { allow: ['com', 'net'] }}).required(),
-    password: Joi.string().pattern(new RegExp('^[a-zA-Z0-9]{6,30}$')).required(),
-    repeatPassword: Joi.ref('password').required()
+    password: Joi.string().alphanum().pattern(/[a-zA-Z0-9]/).min(6).required(),
   })
 
-  schema.validate({
+  const { error, value } = schema.validate({
     name: name, 
     email: email, 
     password: password, 
-    repeatPassword: repeatPassword
   })
 
   if(error){
@@ -34,6 +34,7 @@ app.post("/sign-up", async (req, res) => {
     `, [email]);
 
     const validateUser = user.rows[0];
+
     if(validateUser){
       return res.sendStatus(400);
     }
