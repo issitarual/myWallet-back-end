@@ -53,6 +53,44 @@ app.post("/sign-up", async (req, res) => {
     console.log(e);
     res.sendStatus(400);
   }
+});
+
+app.post("/sign-in", async (req, res) => {
+  const { email, password } = req.body;
+
+  const schema = Joi.object({
+    email: Joi.string().email({ minDomainSegments: 2, tlds: { allow: ['com', 'net'] }}).required(),
+    password: Joi.string().alphanum().pattern(/[a-zA-Z0-9]/).min(6).required(),
+  })
+
+  const { error, value } = schema.validate({
+    email: email, 
+    password: password, 
+  })
+
+  if(error) return res.sendStatus(400);
+
+  try{
+    const user = await connection.query(`
+      SELECT * FROM users
+      WHERE email = $1
+    `, [email]);
+
+    const validateUser = user.rows[0];
+
+    if(validateUser && bcrypt.compareSync(password, validateUser.password)){
+      res.send(validateUser);
+    } 
+    else{ 
+      res.sendStatus (400);
+    }
+
+  }
+  catch(e){
+    console.log(e);
+    res.sendStatus(400);
+  }
+
 })
 
 app.listen(4000, () => {
