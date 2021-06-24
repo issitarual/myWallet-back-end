@@ -115,14 +115,13 @@ app.post("/finances", async (req, res) => {
     description: Joi.string().alphanum().pattern(/[a-zA-Z0-9]/).min(1).required()
   })
 
-  const { error, value } = schema.validate({
-    email: email, 
-    password: password, 
+  const { error } = schema.validate({
+    value: value, 
+    description: description
   })
 
   if(error) return res.sendStatus(400);
 
-  const date = dayjs();
   try{
     const result = await connection.query(`
       SELECT users.*, categories.id AS "categoryId"
@@ -133,14 +132,14 @@ app.post("/finances", async (req, res) => {
       ON categories.name = $1
       WHERE sessions.token = $2
     `, [event_type, token]);
-
     const user = result.rows[0];
     if(user && user.categoryId){
       await connection.query(`
-        INSERT INTO financial_events
-        (valor, description, "categoryId", "userId", created_at)
-        VALUES ($1, $2, $3, $4,$5)
-      `[value, description, user.categoryId, user.id, date]);
+        INSERT INTO financial_events 
+        (valor, description, "categoryId", "userId", created_at) 
+        VALUES ($1, $2, $3, $4, NOW());
+      `,[value, description, user.categoryId, user.id]);
+
       res.sendStatus(201);
     }
     else{
